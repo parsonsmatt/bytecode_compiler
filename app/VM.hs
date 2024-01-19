@@ -343,15 +343,15 @@ debugExecuteBytecode = do
             exec opcode
             debugExecuteBytecode
 
-executeBytecode = executeUnboxed
--- executeBytecode :: VM ()
--- executeBytecode = do
---     !opcode <- fetchOpcode
---     case opcode of
---         EXIT -> return ()
---         _ -> do
---             exec $! opcode
---             executeBytecode
+--executeBytecode = executeUnboxed
+executeBytecode :: VM ()
+executeBytecode = do
+    !opcode <- fetchOpcode
+    case opcode of
+        EXIT -> return ()
+        _ -> do
+            exec $! opcode
+            executeBytecode
 
 executeUnboxed :: VM ()
 executeUnboxed = do
