@@ -1,0 +1,13 @@
+function outer() -> () -> Int {
+    let x = 8
+    x = 6
+    function inner() -> Int {
+        return x + 3
+    }
+    return inner
+}
+
+var x = outer()()
+
+print x
+print x

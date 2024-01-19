@@ -1,0 +1,70 @@
+cabal-version:      2.4
+name:               bytecode-compiler
+version:            0.1.0.0
+
+-- A short (one-line) description of the package.
+-- synopsis:
+
+-- A longer description of the package.
+-- description:
+
+-- A URL where users can report bugs.
+-- bug-reports:
+
+-- The license under which the package is released.
+-- license:
+author:             Your Name
+maintainer:         you@example.com
+
+-- A copyright notice.
+-- copyright:
+-- category:
+extra-source-files: CHANGELOG.md
+
+executable bytecode-compiler
+    main-is:          Main.hs
+
+    -- Modules included in this executable, other than Main.
+    other-modules:
+        Ast
+        Opcode
+        Parser
+        Bytecode
+        VM
+        Test
+        Typechecker
+        CompilerError
+        TypeAnnotation
+        Unification
+
+    -- LANGUAGE extensions used by modules in this package.
+    -- other-extensions:
+    build-depends:
+        base ^>=4.16.4.0,
+        megaparsec,
+        transformers,
+        extra,
+        vector,
+        containers,
+        text,
+        diagnose,
+        mtl,
+        ansi-terminal
+    hs-source-dirs:   app
+    default-language: Haskell2010
+    -- ghc-options: -O2
+        -- -fprof-auto
+
+-- library
+--     if flag(megaparsec-compat)
+--     build-depends:
+--         containers ==0.6.*
+--       , megaparsec >=9.0.0
+--     if flag(megaparsec-compat)
+--     exposed-modules:
+--         Error.Diagnose.Compat.Megaparsec
+
+flag megaparsec-compat
+  description: Includes a small compatibility layer (in the module `Error.Diagnose.Compat.Megaparsec`) to transform megaparsec errors into reports for this library.
+  manual: True
+  default: False
