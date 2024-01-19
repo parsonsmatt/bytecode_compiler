@@ -1,9 +1,13 @@
 {-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Parser where
 
+import GHC.Generics
 import Text.Megaparsec
 import Text.Megaparsec.Char
+import qualified Data.Text as Text
 import qualified Text.Megaparsec.Char.Lexer as L
 import Data.Void (Void)
 import Data.Functor
@@ -14,6 +18,7 @@ import Data.Maybe (fromJust)
 import Debug.Trace
 import Control.Monad
 import Data.List (singleton)
+import Control.DeepSeq
 
 data ErrType = NoTypeForParam String
     | TrailingCommaInFuncArgs
@@ -22,10 +27,10 @@ data ErrType = NoTypeForParam String
     | NoClosingBrace
     | NoCommaBeforeParam
     | ConditionNotSupplied String
-    deriving (Eq, Show, Ord)
+    deriving (Eq, Show, Ord, Generic, NFData)
 
 data Err = Err {errType :: ErrType, errLength :: Int}
-    deriving (Eq, Show, Ord)
+    deriving (Eq, Show, Ord, Generic, NFData)
 
 throwError :: Int -> ErrType -> Int -> Parser ()
 throwError o t n = registerParseError (FancyError o (E.singleton (ErrorCustom $ Err t n)))
@@ -66,7 +71,7 @@ parseBool = (string "True" $> True) <|> (string "False" $> False)
 
 parseValue :: Parser Value
 parseValue = Int <$> parseInt
-    <|> String <$> parseString
+    <|> String . Text.pack <$> parseString
     <|> Bool <$> parseBool
 
 parseWithPos :: Parser (Position -> a) -> Parser a

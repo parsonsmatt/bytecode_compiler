@@ -31,8 +31,8 @@ resultTypeToDiagnose :: CompileResultType
     -> [(E.Position, Marker String)]
     -> [Note String]
     -> Report String
-resultTypeToDiagnose CompileError = err
-resultTypeToDiagnose CompileWarning = warn
+resultTypeToDiagnose CompileError = Error.Diagnose.Err
+resultTypeToDiagnose CompileWarning = Error.Diagnose.Warn
 
 beautifyCompileResult :: CompileResult a => a -> Report String
 beautifyCompileResult r =

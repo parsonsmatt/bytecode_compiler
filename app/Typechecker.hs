@@ -2,6 +2,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use tuple-section" #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Typechecker (
     TypeError(..),
@@ -12,6 +13,7 @@ module Typechecker (
     typecheck''
 ) where
 
+import qualified Data.Text as Text
 import Ast
 import Control.Monad
 import Control.Applicative
@@ -552,7 +554,7 @@ typecheckStmt' stmt = (\v -> v >>= \v -> return $ TStmt v stmt.stmtPos) <$> case
             Nothing -> do
                 addError (TypeError UnexpectedReturnStmt stmt.stmtPos [])
                 return $ Just (TReturnStmt (tAnyExpWrapper exp))
-    s -> error (show s)
+    -- s -> error (show s)
 
 inferBinaryIntOp :: Exp -> Exp -> (TExp -> TExp -> TExpType) -> String -> TypeChecker (Maybe (TExpType, Type))
 inferBinaryIntOp x y t s = do
@@ -613,7 +615,7 @@ inferExp exp = (>>= \(v, t') -> return $ TExp v exp.expPos t') <$> case exp.expT
             _ -> return Nothing
     StaticType exp -> do
         x <- inferExp exp
-        return (x <&> \x -> (TVal (String (show x.tExpType)), STRING))
+        return (x <&> \x -> (TVal (String (Text.pack $ show x.tExpType)), STRING))
     CallFunc exp exps -> do
         x <- inferExp exp
         case x of
@@ -837,7 +839,7 @@ typecheckExp' exp t = (\(v, t') -> TExp v exp.expPos t') <$> case exp.expType of
         return (TIf cond' a b, a.tExpType)
     StaticType exp -> do
         x <- typecheckExp' exp Nothing
-        return (TVal (String (show x.tExpType)), STRING)
+        return (TVal (String (Text.pack $ show x.tExpType)), STRING)
     x -> error $ "couldn't typecheck: " ++ show x
 
 valueIsOfType :: Value -> Type -> Bool

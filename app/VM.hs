@@ -14,7 +14,7 @@ import Ast (Value(..))
 import Opcode
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as U
-import qualified Data.Map.Strict as M
+import qualified Data.IntMap.Strict as M
 import Data.Word
 import Data.Bits
 import Data.Maybe
@@ -22,7 +22,7 @@ import Debug.Trace
 
 type CONSTANTS_TABLE = [Value]
 
-type LocalVariables = M.Map Int BytecodeValue
+type LocalVariables = M.IntMap BytecodeValue
 
 data CallFrame = CallFrame {
     function' :: {-# UNPACK #-} !Function,
@@ -34,7 +34,7 @@ data Env = Env {
     prevCallFrames :: [CallFrame],
     currentCallFrame :: {-# UNPACK #-} !CallFrame,
     stack :: [BytecodeValue],
-    globals :: M.Map Word16 BytecodeValue
+    globals :: M.IntMap BytecodeValue
 }
 
 callFrameFromChunk :: Chunk -> CallFrame
@@ -74,7 +74,7 @@ fetchByte = do
     incIP
     return $! opcodes U.! ip
 
-fetchWord16 :: VM Word16
+fetchWord16 :: VM Int
 fetchWord16 = do
     !byte <- fromEnum . (`shiftL` 8) <$> fetchByte
     !byte' <- fromEnum <$> fetchByte
@@ -92,7 +92,7 @@ addLocal x value = modifyLocals (M.insert x value)
 getLocals :: VM LocalVariables
 getLocals = locals <$> getCallFrame
 
-getUpvalues :: VM (M.Map Int BytecodeValue)
+getUpvalues :: VM (M.IntMap BytecodeValue)
 getUpvalues = funcUpvalues . function' <$> getCallFrame
 
 getCallFrame :: VM CallFrame
@@ -126,13 +126,13 @@ removeStackFrame = do
     let prev = head frames
     modify' (\env -> env { prevCallFrames = tail frames, currentCallFrame = prev })
 
-modifyGlobals :: (M.Map Word16 BytecodeValue -> M.Map Word16 BytecodeValue) -> VM ()
+modifyGlobals :: (M.IntMap BytecodeValue -> M.IntMap BytecodeValue) -> VM ()
 modifyGlobals f = modify' (\env -> env { globals = f (globals env) })
 
-addVariable :: (Word16, BytecodeValue) -> VM ()
-addVariable (var, val) = modifyGlobals (M.insert var val)
+addVariable :: Int -> BytecodeValue -> VM ()
+addVariable !var !val = modifyGlobals (M.insert var val)
 
-getVariable :: Word16 -> VM BytecodeValue
+getVariable :: Int -> VM BytecodeValue
 getVariable var = do
     env <- get
     case M.lookup var (globals env) of
@@ -208,7 +208,7 @@ execUnboxed 4 = do
 execUnboxed 6 = do
     x <- pop
     w <- fetchWord16
-    addVariable (w, x)
+    addVariable w x
 -- LOAD_NAME
 execUnboxed 7 = fetchWord16 >>= getVariable >>= push
 -- ADD
@@ -242,7 +242,7 @@ exec LOAD_CONST = do
 exec !STORE_NAME = do
     x <- pop
     w <- fetchWord16
-    addVariable (w, x)
+    addVariable w x
 exec !LOAD_NAME = fetchWord16 >>= getVariable >>= push
 exec STORE_FAST = do
     n <- fromEnum <$> fetchWord16

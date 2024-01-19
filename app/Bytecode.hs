@@ -1,5 +1,10 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase #-}
+
 {-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE StrictData #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 module Bytecode (
     Chunk (..),
     Program (..),
@@ -9,6 +14,8 @@ module Bytecode (
     disassembleProgram
 ) where
 
+import GHC.Generics
+import Control.DeepSeq
 import Opcode
 import Ast
 import Control.Monad.Trans.State
@@ -22,6 +29,7 @@ import qualified Data.Sequence as S
 import Data.Sequence ((|>))
 import qualified Data.Text as T
 import qualified Data.Map.Strict as M
+import qualified Data.IntMap.Strict as IM
 import Data.List
 import Data.Word
 import Data.Bits ( Bits((.&.), shiftL, shiftR) )
@@ -40,12 +48,12 @@ type Offset = Int
 
 type Label = Int
 
-data BytecodeValue = BInt !Int | BString !T.Text | BBool !Bool | Func !Function deriving (Show, Eq, Ord)
+data BytecodeValue = BInt !Int | BString !T.Text | BBool !Bool | Func !Function deriving (Show, Eq, Ord, NFData, Generic)
 type Compiler a = StateT CompilerEnv (Either String) a
 
 valueToBytecodeValue :: Value -> BytecodeValue
 valueToBytecodeValue (Int x) = BInt x
-valueToBytecodeValue (String s) = BString (T.pack s)
+valueToBytecodeValue (String s) = BString s
 valueToBytecodeValue (Bool b) = BBool b
 
 data LocalVariable = LocalVariable {
@@ -59,9 +67,9 @@ data Upvalue = Upvalue {
 } deriving (Show, Eq, Ord)
 
 data Chunk = Chunk {
-    code :: {-# UNPACK #-} U.Vector Word8,
+    code :: {-# UNPACK #-} !(U.Vector Word8),
     constantsPool :: {-# UNPACK #-} V.Vector BytecodeValue
-} deriving (Show, Eq, Ord)
+} deriving (Show, Eq, Ord, NFData, Generic)
 
 modifyChunkCode :: Chunk -> (U.Vector Word8 -> U.Vector Word8) -> Chunk
 modifyChunkCode chunk f = chunk { code = f (code chunk) }
@@ -71,11 +79,11 @@ newChunk = Chunk U.empty V.empty
 
 data Function = Function {
     chunk :: {-# UNPACK #-} !Chunk,
-    funcUpvalues :: M.Map Int BytecodeValue
-} deriving (Show, Eq, Ord)
+    funcUpvalues :: IM.IntMap BytecodeValue
+} deriving (Show, Eq, Ord, Generic, NFData)
 
 newFunction :: Function
-newFunction = Function newChunk M.empty
+newFunction = Function newChunk IM.empty
 
 emitByte :: Word8 -> Compiler ()
 emitByte n = do
@@ -171,7 +179,7 @@ getOffset = opcodesLength
 
 data Program = Program {
     mainChunk :: Chunk
-} deriving Show
+} deriving (Generic, NFData, Show)
 
 fromJust :: Maybe a -> a
 fromJust (Just a) = a

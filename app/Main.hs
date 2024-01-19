@@ -1,9 +1,11 @@
 {-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use :" #-}
 
 module Main where
 
+import System.Clock
 import System.Environment (getArgs)
 import System.IO (openFile, IOMode (ReadMode), hGetContents)
 import Parser
@@ -25,6 +27,7 @@ import Data.List
 import Data.Maybe
 import Ast
 -- import Error.Diagnose.Compat.Megaparsec
+import Control.DeepSeq
 
 testParse :: IO ()
 testParse = do
@@ -139,24 +142,46 @@ testRunDebug = do
 --             Right t -> putStrLn t
 
 text = "fib :: (x: Int) -> Int\nfib(x) = 2\nprint fib(10)"
+
+timed :: String -> IO a -> IO a
+timed message action = do
+    start <- getTime Monotonic
+    a <- action
+    end <- getTime Monotonic
+    print (message <> " Action took: ", toNanoSecs (diffTimeSpec end start) `div` 1000, " milliseconds")
+    pure a
+
 main :: IO ()
-main = do
+main = timed "main" $ do
     args <- getArgs
     -- let filename = "test.txt"
     let filename = head args
     file <- openFile filename ReadMode
     text <- hGetContents file
-    case parse parseProgram "error" text of
+    parseResult <- timed "parseProgram" $ do
+        pure $!! parse parseProgram "error" text
+    case parseResult of
         Left err -> putStrLn $ errorBundlePretty err
-        Right ast -> case typecheck'' ast text filename of
-            Right tast -> case compileProgram tast of
-                Left err -> putStrLn err
-                Right program -> runExecProgram program
-            Left errs -> do
-                let reports = map beautifyCompileResult errs
-                let diagnostic = addFile mempty filename text
-                let diagnostic' = foldl addReport diagnostic reports
-                printDiagnostic stdout WithUnicode (TabSize 4) defaultStyle diagnostic'
+        Right ast ->  do
+            tast <- timed "typecheck''" $ do
+                typechecked <- pure $! typecheck'' ast text filename
+                case typechecked of
+                    Right tast -> do
+                        pure $!! tast
+                    Left errs -> do
+                        let reports = map beautifyCompileResult errs
+                        let diagnostic = addFile mempty filename text
+                        let diagnostic' = foldl addReport diagnostic reports
+                        printDiagnostic stdout WithUnicode (TabSize 4) defaultStyle diagnostic'
+                        error "oh no"
+            program <- timed "compileProgram" $ do
+                compiled <- pure $! compileProgram tast
+                case compiled of
+                    Left err -> do
+                        putStrLn err
+                        error "oh no"
+                    Right program -> pure $!! program
+            timed "runExecProgram" $ runExecProgram program
 
 -- main :: IO ()
 -- main = do
@@ -242,7 +267,7 @@ data SupportError = SupportError {
 
 beautifyErr' :: (String, SourcePos) -> [(String, SourcePos)] -> Report String
 beautifyErr' (s, pos) supporting =
-    err
+    Error.Diagnose.Err
         (Just "reassign immutable var")
         s
         -- "Attempt to reassign immutable variable"
@@ -276,7 +301,7 @@ beautifyTypeErrs = map beautifyErr
 
 beautifyErr :: TypeErrorSrc -> Report String
 beautifyErr t = case t._tErrType of
-    ReassignImmutableVar s -> err
+    ReassignImmutableVar s -> Error.Diagnose.Err
         -- Nothing
         (Just "reassign immutable var")
         "Attempt to reassign immutable variable"
@@ -319,7 +344,7 @@ beautifyErr t = case t._tErrType of
 --         [Note "Try doing x, y, and z"]
 
 beautifulExample =
-      err
+      Error.Diagnose.Err
         (Just "what")
         "Could not deduce constraint 'Num(a)' from the current context"
         [ (E.Position (1, 25) (2, 6) "test.txt", This "While applying function '+'"),
